@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cat Pomodoro Timer</title>
+    <!-- Tailwind CSS CDN for easy styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles to ensure Inter font and good defaults */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        /* Ensure responsive font sizes */
+        .text-6xl {
+            font-size: 4rem; /* Default for larger screens */
+        }
+        @media (max-width: 640px) {
+            .text-6xl {
+                font-size: 3rem; /* Smaller for mobile */
+            }
+            .text-4xl {
+                font-size: 2.25rem;
+            }
+            .text-2xl {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-gray-200">
+        <h1 class="text-4xl font-extrabold text-gray-800 mb-6">🐈 Cat Pomodoro</h1>
+
+        <!-- Cat Activity Display -->
+        <div id="activity-display" class="text-2xl font-semibold text-purple-700 mb-4 h-8 flex items-center justify-center">
+            Sleeping...
+        </div>
+
+        <!-- Cat Emoji Display -->
+        <div id="cat-emoji" class="text-6xl mb-6 select-none">
+            😴
+        </div>
+
+        <!-- Timer Display -->
+        <div id="timer-display" class="text-6xl font-bold text-gray-900 mb-8">
+            25:00
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="flex justify-center space-x-4">
+            <button id="start-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                Start
+            </button>
+            <button id="pause-button" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-xl shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                Pause
+            </button>
+            <button id="reset-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-xl shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                Reset
+            </button>
+        </div>
+
+        <!-- Audio element for meow sound -->
+        <audio id="meow-sound" src="https://www.soundjay.com/animals/sounds/cat-meow-1.mp3" preload="auto"></audio>
+    </div>
+
+    <script>
+        // Get references to HTML elements
+        const activityDisplay = document.getElementById('activity-display');
+        const catEmoji = document.getElementById('cat-emoji');
+        const timerDisplay = document.getElementById('timer-display');
+        const startButton = document.getElementById('start-button');
+        const pauseButton = document.getElementById('pause-button');
+        const resetButton = document.getElementById('reset-button');
+        const meowSound = document.getElementById('meow-sound');
+
+        // Define the sequence of activities for the cat
+        // Each activity has a name, duration (in seconds), an emoji, and whether it triggers a meow
+        const activities = [
+            { name: 'Sleeping...', duration: 25 * 60, emoji: '�', meow: false }, // 25 minutes sleep
+            { name: 'Meow!', duration: 3, emoji: '🔊', meow: true },            // Short meow transition
+            { name: 'Grooming...', duration: 5 * 60, emoji: '😼', meow: false }, // 5 minutes groom
+            { name: 'Meow!', duration: 3, emoji: '🔊', meow: true },            // Short meow transition
+            { name: 'Sleeping...', duration: 25 * 60, emoji: '😴', meow: false }  // Back to 25 minutes sleep
+        ];
+
+        let currentActivityIndex = 0; // Tracks the current activity in the sequence
+        let timeLeft = activities[currentActivityIndex].duration; // Time remaining for the current activity
+        let timerInterval; // Stores the interval ID for clearing the timer
+        let isPaused = false; // Flag to check if the timer is paused
+
+        /**
+         * Formats the time in seconds into a MM:SS string.
+         * @param {number} seconds - The total seconds to format.
+         * @returns {string} - Formatted time string (e.g., "05:30").
+         */
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            // Pad with leading zero if less than 10
+            return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+        }
+
+        /**
+         * Updates the display with the current activity, emoji, and time.
+         */
+        function updateDisplay() {
+            const currentActivity = activities[currentActivityIndex];
+            activityDisplay.textContent = currentActivity.name;
+            catEmoji.textContent = currentActivity.emoji;
+            timerDisplay.textContent = formatTime(timeLeft);
+        }
+
+        /**
+         * Plays the meow sound. Includes error handling for audio playback.
+         */
+        function playMeowSound() {
+            if (meowSound) {
+                meowSound.currentTime = 0; // Rewind to start in case it's already playing
+                meowSound.play().catch(error => {
+                    // Catch and log any errors, e.g., if user hasn't interacted with the page yet
+                    console.warn("Audio playback failed:", error);
+                    // You could add a visual indicator here instead of an alert
+                    // For example, a small text message "Sound blocked, click to enable"
+                });
+            }
+        }
+
+        /**
+         * Starts or resumes the timer.
+         */
+        function startTimer() {
+            if (timerInterval) return; // Prevent multiple intervals from running
+
+            isPaused = false;
+            // Set an interval to update the timer every second
+            timerInterval = setInterval(() => {
+                if (timeLeft > 0) {
+                    timeLeft--; // Decrement time
+                } else {
+                    // Time's up for the current activity
+                    clearInterval(timerInterval); // Stop the current interval
+
+                    const currentActivity = activities[currentActivityIndex];
+                    if (currentActivity.meow) {
+                        playMeowSound(); // Play meow sound if required for this activity
+                    }
+
+                    // Move to the next activity in the sequence
+                    currentActivityIndex = (currentActivityIndex + 1) % activities.length;
+                    timeLeft = activities[currentActivityIndex].duration; // Set time for the new activity
+
+                    // Automatically restart the timer for the next activity
+                    startTimer();
+                }
+                updateDisplay(); // Update the display every second
+            }, 1000); // 1000 milliseconds = 1 second
+        }
+
+        /**
+         * Pauses the timer.
+         */
+        function pauseTimer() {
+            clearInterval(timerInterval); // Stop the interval
+            timerInterval = null; // Clear the interval ID
+            isPaused = true;
+        }
+
+        /**
+         * Resets the timer to the initial sleeping state.
+         */
+        function resetTimer() {
+            pauseTimer(); // Stop the timer first
+            currentActivityIndex = 0; // Go back to the first activity (sleeping)
+            timeLeft = activities[currentActivityIndex].duration; // Reset time
+            updateDisplay(); // Update the display
+            isPaused = false; // Reset pause state
+        }
+
+        // Add event listeners to the buttons
+        startButton.addEventListener('click', startTimer);
+        pauseButton.addEventListener('click', pauseTimer);
+        resetButton.addEventListener('click', resetTimer);
+
+        // Initial display update when the page loads
+        window.onload = updateDisplay;
+    </script>
+</body>
+</html>
+�
